@@ -1,0 +1,46 @@
+version: 2
+
+sources:
+  - name: raw
+    tables:
+      - name: yellow_taxi_cleaned
+        description: "Cleaned yellow taxi trip data for 2024"
+        
+      - name: green_taxi_cleaned
+        description: "Cleaned green taxi trip data for 2024"
+        
+      - name: vehicle_emissions
+        description: "Vehicle emissions lookup table with CO2 data per vehicle type"
+
+models:
+  - name: stg_yellow_taxi_transformed
+    description: "Yellow taxi trips with calculated CO2, speed, and temporal features"
+    columns:
+      - name: trip_co2_kgs
+        description: "CO2 emissions in kilograms for the trip"
+      - name: avg_mph
+        description: "Average speed in miles per hour"
+      - name: hour_of_day
+        description: "Hour of day (0-23)"
+      - name: day_of_week
+        description: "Day of week name"
+      - name: week_of_year
+        description: "Week number of year (1-52)"
+      - name: month_of_year
+        description: "Month of year (1-12)"
+
+  - name: stg_green_taxi_transformed
+    description: "Green taxi trips with calculated CO2, speed, and temporal features"
+    columns:
+      - name: trip_co2_kgs
+        description: "CO2 emissions in kilograms for the trip"
+      - name: avg_mph
+        description: "Average speed in miles per hour"
+      - name: hour_of_day
+        description: "Hour of day (0-23)"
+      - name: day_of_week
+        description: "Day of week name"
+      - name: week_of_year
+        description: "Week number of year (1-52)"
+      - name: month_of_year
+        description: "Month of year (1-12)"
