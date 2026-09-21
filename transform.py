@@ -1,138 +1,80 @@
 import duckdb
 import logging
 
-# NOTE: For additional 6 points, DBT models are also provided in dbt/models/staging/:
-# - stg_yellow_taxi_transformed.sql
-# - stg_green_taxi_transformed.sql
-# Run "dbt run" in the dbt/ directory to execute these models.
-
 logging.basicConfig(
-    level=logging.INFO, 
+    level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='transform.log',
-    filemode='w'
-)
-
-logging.basicConfig(
-    level=logging.INFO, 
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='transform.log',
-    filemode='w'
+    handlers=[logging.FileHandler('transform.log'), logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
 
-def transform_trips() -> None:
-    """
-    Transform cleaned taxi trip data by adding calculated columns:
-    1. trip_co2_kgs: CO2 output calculated from trip distance and vehicle emissions lookup
-    2. avg_mph: Average miles per hour (distance / duration)
-    3. hour_of_day: Hour extracted from pickup_time
-    4. day_of_week: Day of week from pickup_time
-    5. week_of_year: Week number from pickup_time
-    6. month_of_year: Month from pickup_time
-    """
+
+def add_columns(con, table):
+    """Add the six new columns (safe to re-run)."""
+    con.execute(f"""
+        ALTER TABLE {table} ADD COLUMN IF NOT EXISTS trip_co2_kgs DOUBLE;
+        ALTER TABLE {table} ADD COLUMN IF NOT EXISTS avg_mph DOUBLE;
+        ALTER TABLE {table} ADD COLUMN IF NOT EXISTS hour_of_day INTEGER;
+        ALTER TABLE {table} ADD COLUMN IF NOT EXISTS day_of_week INTEGER;
+        ALTER TABLE {table} ADD COLUMN IF NOT EXISTS week_of_year INTEGER;
+        ALTER TABLE {table} ADD COLUMN IF NOT EXISTS month_of_year INTEGER;
+    """)
+    logger.info(f"{table}: columns added")
+
+
+def fill_columns(con, color):
+    """Fill in co2, mph and the date parts for one taxi color."""
+    table = f"{color}_trips"
+    # co2 factor is looked up from vehicle_emissions, not hard-coded
+    con.execute(f"""
+        UPDATE {table} SET
+            trip_co2_kgs = trip_distance * (
+                SELECT co2_grams_per_mile FROM vehicle_emissions
+                WHERE vehicle_type = '{color}_taxi'
+            ) / 1000,
+            avg_mph = trip_distance / (DATE_DIFF('second', pickup_time, dropoff_time) / 3600.0),
+            hour_of_day = HOUR(pickup_time),
+            day_of_week = DAYOFWEEK(pickup_time),
+            week_of_year = WEEKOFYEAR(pickup_time),
+            month_of_year = MONTH(pickup_time);
+    """)
+    logger.info(f"{table}: trip_co2_kgs, avg_mph, hour_of_day, day_of_week, "
+                f"week_of_year, month_of_year filled in")
+
+
+def print_stats(con, table):
+    """Log a quick summary of the new columns."""
+    stats = con.execute(f"""
+        SELECT COUNT(*),
+               ROUND(SUM(trip_co2_kgs), 2),
+               ROUND(AVG(trip_co2_kgs), 3),
+               ROUND(AVG(avg_mph), 2)
+        FROM {table}
+    """).fetchone()
+    logger.info(f"{table}: rows={stats[0]}, total_co2_kgs={stats[1]}, "
+                f"avg_co2_kgs={stats[2]}, avg_mph={stats[3]}")
+
+
+def transform_tables():
+    """Run the transformations on both trip tables."""
     con = None
-    
+
     try:
-        # Connect to DuckDB instance
         con = duckdb.connect(database='emissions.duckdb', read_only=False)
         logger.info("Connected to DuckDB instance")
-        
-        # Transform Yellow Taxi Data
-        logger.info("=== TRANSFORMING YELLOW TAXI DATA ===")
-        logger.info("Creating yellow_taxi_transformed table...")
-        
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS yellow_taxi_transformed AS
-            SELECT 
-                ytc.*,
-                ROUND((ytc.trip_distance * ve.co2_grams_per_mile / 1000)::NUMERIC, 2) as trip_co2_kgs,
-                ROUND((ytc.trip_distance / (ytc.duration_seconds / 3600.0))::NUMERIC, 2) as avg_mph,
-                EXTRACT(HOUR FROM ytc.pickup_time) as hour_of_day,
-                DAYNAME(ytc.pickup_time) as day_of_week,
-                EXTRACT(WEEK FROM ytc.pickup_time) as week_of_year,
-                EXTRACT(MONTH FROM ytc.pickup_time) as month_of_year
-            FROM yellow_taxi_cleaned ytc
-            JOIN vehicle_emissions ve ON ve.vehicle_type = 'yellow_taxi'
-        """)
-        logger.info("Created yellow_taxi_transformed table")
-        
-        # Verify columns
-        yellow_cols = con.execute(
-            "SELECT column_name FROM information_schema.columns WHERE table_name = 'yellow_taxi_transformed' ORDER BY column_name"
-        ).fetchall()
-        print(f"Yellow Taxi - Columns: {[col[0] for col in yellow_cols]}")
-        logger.info(f"Yellow taxi columns: {[col[0] for col in yellow_cols]}")
-        
-        # Verify calculated columns are not null
-        yellow_co2_nulls = con.execute(
-            "SELECT COUNT(*) FROM yellow_taxi_transformed WHERE trip_co2_kgs IS NULL"
-        ).fetchall()[0][0]
-        print(f"Yellow Taxi - NULL trip_co2_kgs values: {yellow_co2_nulls}")
-        logger.info(f"Yellow taxi NULL CO2 values: {yellow_co2_nulls}")
-        
-        yellow_mph_nulls = con.execute(
-            "SELECT COUNT(*) FROM yellow_taxi_transformed WHERE avg_mph IS NULL"
-        ).fetchall()[0][0]
-        print(f"Yellow Taxi - NULL avg_mph values: {yellow_mph_nulls}")
-        logger.info(f"Yellow taxi NULL MPH values: {yellow_mph_nulls}")
-        
-        yellow_count = con.execute("SELECT COUNT(*) FROM yellow_taxi_transformed").fetchall()[0][0]
-        print(f"Yellow Taxi - Total transformed rows: {yellow_count:,}\n")
-        logger.info(f"Yellow taxi transformed rows: {yellow_count}")
-        
-        # Transform Green Taxi Data
-        logger.info("=== TRANSFORMING GREEN TAXI DATA ===")
-        logger.info("Creating green_taxi_transformed table...")
-        
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS green_taxi_transformed AS
-            SELECT 
-                gtc.*,
-                ROUND((gtc.trip_distance * ve.co2_grams_per_mile / 1000)::NUMERIC, 2) as trip_co2_kgs,
-                ROUND((gtc.trip_distance / (gtc.duration_seconds / 3600.0))::NUMERIC, 2) as avg_mph,
-                EXTRACT(HOUR FROM gtc.pickup_time) as hour_of_day,
-                DAYNAME(gtc.pickup_time) as day_of_week,
-                EXTRACT(WEEK FROM gtc.pickup_time) as week_of_year,
-                EXTRACT(MONTH FROM gtc.pickup_time) as month_of_year
-            FROM green_taxi_cleaned gtc
-            JOIN vehicle_emissions ve ON ve.vehicle_type = 'green_taxi'
-        """)
-        logger.info("Created green_taxi_transformed table")
-        
-        # Verify columns
-        green_cols = con.execute(
-            "SELECT column_name FROM information_schema.columns WHERE table_name = 'green_taxi_transformed' ORDER BY column_name"
-        ).fetchall()
-        print(f"Green Taxi - Columns: {[col[0] for col in green_cols]}")
-        logger.info(f"Green taxi columns: {[col[0] for col in green_cols]}")
-        
-        # Verify calculated columns are not null
-        green_co2_nulls = con.execute(
-            "SELECT COUNT(*) FROM green_taxi_transformed WHERE trip_co2_kgs IS NULL"
-        ).fetchall()[0][0]
-        print(f"Green Taxi - NULL trip_co2_kgs values: {green_co2_nulls}")
-        logger.info(f"Green taxi NULL CO2 values: {green_co2_nulls}")
-        
-        green_mph_nulls = con.execute(
-            "SELECT COUNT(*) FROM green_taxi_transformed WHERE avg_mph IS NULL"
-        ).fetchall()[0][0]
-        print(f"Green Taxi - NULL avg_mph values: {green_mph_nulls}")
-        logger.info(f"Green taxi NULL MPH values: {green_mph_nulls}")
-        
-        green_count = con.execute("SELECT COUNT(*) FROM green_taxi_transformed").fetchall()[0][0]
-        print(f"Green Taxi - Total transformed rows: {green_count:,}\n")
-        logger.info(f"Green taxi transformed rows: {green_count}")
-        
-        con.close()
-        logger.info("Data transformation completed successfully")
-        print("Transformation complete!")
-        
+
+        for color in ["yellow", "green"]:
+            add_columns(con, f"{color}_trips")
+            fill_columns(con, color)
+            print_stats(con, f"{color}_trips")
+
     except Exception as e:
         print(f"An error occurred: {e}")
         logger.error(f"An error occurred: {e}")
+    finally:
         if con:
             con.close()
 
+
 if __name__ == "__main__":
-    transform_trips()
+    transform_tables()
