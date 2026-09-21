@@ -1,39 +1,6 @@
-# DuckDB database file
-emissions.duckdb
-*.duckdb
-
-# Parquet data files
 *.parquet
-
-# Log files
+*.duckdb
+*.duckdb.wal
 *.log
-
-# Python cache
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-
-# Virtual environments
-venv/
-env/
-ENV/
-.venv
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# DBT
-dbt/target/
-dbt/dbt_packages/
-dbt/.env
-
-# Plot/output files are okay to commit as they're results
-# co2_by_month.png is included intentionally
+.venv/
