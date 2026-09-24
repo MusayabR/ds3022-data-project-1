@@ -18,7 +18,7 @@ that runs load.py, clean.py, transform.py and analysis.py in order. each one mak
 
 ## what each file does
 
-load.py - downloads the 24 parquet files (12 months for yellow and green) and loads them into emissions.duckdb along with the vehicle_emissions csv (8 rows). prints the raw row counts and some stats. i got ______ yellow rows and 660,218 green rows raw.
+load.py - downloads the 24 parquet files (12 months for yellow and green) and loads them into emissions.duckdb along with the vehicle_emissions csv (8 rows). prints the raw row counts and some stats. i got 41,169,720 yellow rows and 660,218 green rows raw.
 
 clean.py - gets rid of duplicates, trips with 0 passengers, 0 miles, over 100 miles, and trips over 86400 seconds (1 day). then it checks each rule again to make sure the count is 0. after cleaning i had 39,434,399 yellow rows and 617,709 green rows.
 
