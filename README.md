@@ -18,13 +18,20 @@ that runs load.py, clean.py, transform.py and analysis.py in order. each one mak
 
 ## what each file does
 
-load.py - downloads the 24 parquet files (12 months for yellow and green) and loads them into emissions.duckdb along with the vehicle_emissions csv (8 rows). prints the raw row counts. i got about ______ yellow rows and ______ green rows.
+load.py - downloads the 24 parquet files (12 months for yellow and green) and loads them into emissions.duckdb along with the vehicle_emissions csv (8 rows). prints the raw row counts and some stats. i got ______ yellow rows and 660,218 green rows raw.
 
-clean.py - gets rid of duplicates, trips with 0 passengers, 0 miles, over 100 miles, and trips longer than a day. then it checks each rule again to make sure the count is 0.
+clean.py - gets rid of duplicates, trips with 0 passengers, 0 miles, over 100 miles, and trips over 86400 seconds (1 day). then it checks each rule again to make sure the count is 0. after cleaning i had 39,434,399 yellow rows and 617,709 green rows.
 
 transform.py - adds trip_co2_kgs, avg_mph, hour_of_day, day_of_week, week_of_year and month_of_year.
 
 analysis.py - finds the biggest co2 trip and the heaviest/lightest hour, day, week and month for yellow and green. also makes co2_by_month.png.
+
+## what i got
+
+- biggest yellow trip was 37.95 kg of co2 (99.86 miles), biggest green was 34.75 kg (99.28 miles)
+- both colors had 5am as the heaviest hour and 6pm as the lightest
+- august was the heaviest month for both, and week 35 was the heaviest week
+- avg speed came out 11.27 mph for yellow and 15.37 for green, green is faster since its mostly outer boroughs
 
 ## stuff i decided
 
