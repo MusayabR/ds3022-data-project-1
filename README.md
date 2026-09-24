@@ -43,3 +43,6 @@ analysis.py - finds the biggest co2 trip and the heaviest/lightest hour, day, we
 - the co2 number comes from the vehicle_emissions table, its not hard coded
 - the plot uses a log scale because yellow is way bigger than green and green looked flat otherwise
 - hours are 0-23, days are 0 = sunday to 6 = saturday, and weeks are iso weeks so dec 30-31 count as week 1
+
+# During this project, AI was used such as Claude and ChatGPT to assist in fixing code, writing small segments that were ambiguous and understand multiple parts of what the project was asking. 
+
